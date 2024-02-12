@@ -5,6 +5,8 @@
 #include <math.h>
 #include <httpserver.h>
 #include "SPIFFS.h"
+#include <esp_log.h>
+#include <ramdb.h>
 
 #define DISTANCE 2000
 
@@ -19,19 +21,19 @@ void delay_rand(uint32_t ms) {
 }
 
 void logMemory() {
-  log_d("Used PSRAM: %d", ESP.getPsramSize() - ESP.getFreePsram());
+  ESP_LOGI("", "Total: %d. Used PSRAM: %d", ESP.getPsramSize(), ESP.getPsramSize() - ESP.getFreePsram());
 }
 
 void WiFiSetup() {
   std::vector<String> wifi_cred;
   if(!SPIFFS.begin(true)){
-    Serial.println("An Error has occurred while mounting SPIFFS");
+    ESP_LOGI("", "An Error has occurred while mounting SPIFFS");
     return;
   }
 
   File file = SPIFFS.open("/wifi");
   if(!file){
-    Serial.println("Failed to open file for reading");
+    ESP_LOGI("", "Failed to open file for reading");
     return;
   }
 
@@ -48,15 +50,20 @@ void WiFiSetup() {
   file.close();
   const char* ssidc = ssid.c_str();
   const char* passwordc = password.c_str();
-  Serial.println(ssidc);
-  Serial.println(passwordc);
-  Serial.println("Conncting WiFI");
+  ESP_LOGI("", "Conncting WiFI with %s %s", ssidc, passwordc);
   WiFi.begin(ssidc, passwordc);
   while(WiFi.status() != WL_CONNECTED){
-      Serial.print(".");
-      delay(100);
+      ESP_LOGI("", "Connecting.");
+      delay(1000);
   }
-  Serial.println(WiFi.localIP());
+  ESP_LOGI("", "%s", WiFi.localIP().toString());
+}
+
+void initParams() {
+  RDB.write("G", "9");
+  RDB.write("W", "5");
+  RDB.write("M", "20");
+  RDB.write("D", "12");
 }
 
 const static std::vector<std::pair<cooint_t, cooint_t>> CURVE{
@@ -73,9 +80,10 @@ void mouseControl(void *parameter)
 
   for (;;)
   {
-    Serial.println("Clicking...");
-    delay_rand(1000);
+    ESP_LOGI("", "Clicking...");
+    delay_rand(2000);
     srand(esp_random());
+    windMouse.syncParams();
     windMouse.press();
     for (auto it = CURVE.begin(); it != CURVE.end(); it++) {
       windMouse.move(it->first, it->second);
@@ -94,7 +102,6 @@ void httpServerControl(void *parameter)
     delay(5000);
   }
 }
-
 
 void TaskPinning() {
   // Set up Core 0 task handler
@@ -121,8 +128,10 @@ void TaskPinning() {
 void setup() {
   Serial.begin(115200);
   logMemory();
+  heap_caps_malloc_extmem_enable(10000);
   delay_rand(1000);
   WiFiSetup();
+  initParams();
   TaskPinning();
 }
 

@@ -3,7 +3,8 @@
 #include "esp_random.h"
 #include <sstream>
 #include "USB.h"
-
+#include <esp_log.h>
+#include <ramdb.h>
 
 const static double sqrt3 = sqrt(3);
 const static double sqrt5 = sqrt(5);
@@ -13,7 +14,7 @@ double z_rand() {
 }
 
 void USBSetup() {
-  Serial.println("Initializing USB");
+  ESP_LOGI("", "Initializing USB");
   USB.VID(0x0817);
   USB.PID(0xA133);
   USB.productName("Magic 2");
@@ -22,17 +23,17 @@ void USBSetup() {
 }
 
 WindMouse::WindMouse() {
-    Serial.println("Starting Mouse");
-    HWMouse hwMouse;
-    m_mouse = hwMouse;
+    ESP_LOGI("", "Starting Mouse");
+    m_mouse = new HWMouse();
     USBSetup();
-    m_mouse.begin();
+    m_mouse->begin();
     errs = std::pair<double, double>(0, 0);
     srand(esp_random());
 }
 
 WindMouse::~WindMouse() {
-    m_mouse.end();
+    m_mouse->end();
+    delete m_mouse;
 }
 
 void WindMouse::move(cooint_t x, cooint_t y) {
@@ -45,30 +46,48 @@ void WindMouse::move(cooint_t x, cooint_t y) {
 }
 
 void WindMouse::press(uint8_t b) {
-    m_mouse.press(b);
+    m_mouse->press(b);
 }
 
 bool WindMouse::isPressed(uint8_t b) {
-    return m_mouse.isPressed(b);
+    return m_mouse->isPressed(b);
 }
 
 void WindMouse::release(uint8_t b) {
-    m_mouse.release(b);
+    m_mouse->release(b);
+}
+
+void WindMouse::do_syncParam(const std::string& key, int8_t& param) {
+    String s(RDB.read(key).c_str());
+    if (!s.isEmpty()) {
+        param = s.toInt();
+    } else {
+        ESP_LOGI("", "Not able to sync %s", key);
+    }
+}
+
+void WindMouse::syncParams() {
+    std::string Gs = "G", Ws = "W", Ms = "M", Ds = "D";
+    do_syncParam("G", G);
+    do_syncParam("W", W);
+    do_syncParam("M", M);
+    do_syncParam("D", D);
 }
 
 void WindMouse::do_move(cooint_t x, cooint_t y) {
-    m_mouse.move(x, y);
+    m_mouse->move(x, y);
     delay(1000/REPORT_RATE);
 }
 
-void WindMouse::windMouse(cooint_t dest_x, cooint_t dest_y, double final_accuracy, int8_t G, int8_t W, int8_t M, int8_t D) {
+void WindMouse::windMouse(cooint_t dest_x, cooint_t dest_y, double final_accuracy) {
     double M_0 = M;
     cooint_t current_x, current_y;
     double start_x, start_y;
     double W_x, W_y, v_x, v_y;
     cooint_t r_dest_x = dest_x + final_accuracy * z_rand();
     cooint_t r_dest_y = dest_y + final_accuracy * z_rand();
-    for(double dist = hypot(r_dest_x - start_x, r_dest_y - start_y); dist >= final_accuracy;) {
+    double distribution = 0.5 * final_accuracy;
+    for(double dist = hypot(r_dest_x - start_x, r_dest_y - start_y); dist >= distribution;) {
         double W_mag = fmin(W, dist);
 
         if (dist >= D) {
