@@ -8,6 +8,8 @@
 #include <esp_log.h>
 #include <ramdb.h>
 
+#define T_RAND_CLIP 0.5
+
 #define DISTANCE 2000
 
 TaskHandle_t Core0Task;
@@ -64,6 +66,8 @@ void initParams() {
   RDB.write("W", "5");
   RDB.write("M", "20");
   RDB.write("D", "12");
+  RDB.write("report_rate", "200");
+  RDB.write("final_accuracy", "500");
 }
 
 const static std::vector<std::pair<cooint_t, cooint_t>> CURVE{
@@ -80,17 +84,10 @@ void mouseControl(void *parameter)
 
   for (;;)
   {
-    ESP_LOGI("", "Clicking...");
-    delay_rand(2000);
+    ESP_LOGI("", "Moving...");
     srand(esp_random());
     windMouse.syncParams();
-    windMouse.press();
-    for (auto it = CURVE.begin(); it != CURVE.end(); it++) {
-      windMouse.move(it->first, it->second);
-    }
-    if (windMouse.isPressed()) {
-      windMouse.release();
-    }
+    windMouse.pullAndMove();
   }
 }
 

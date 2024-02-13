@@ -1,14 +1,12 @@
 #include <vector>
 #include <Arduino.h>
 #include "USBHIDMouse.h"
+#include <ramdb.h>
 #include <map>
 
 #define HWMouse USBHIDMouse
 
 #define cooint_t int16_t
-#define REPORT_RATE 200
-#define T_RAND_CLIP 0.5
-#define FINAL_ACCURACY 200.0
 
 class WindMouse {
     public:
@@ -19,6 +17,7 @@ class WindMouse {
         void release(uint8_t b = MOUSE_LEFT);
         bool isPressed(uint8_t b = MOUSE_LEFT);
         void syncParams();
+        void pullAndMove();
 
     private:
 
@@ -31,6 +30,10 @@ class WindMouse {
         // M_0 - maximum step size (velocity clip threshold)
         // D_0 - distance where wind behavior changes from random to damped
         int8_t G, W, M, D;
+        int16_t report_rate;
+        double final_accuracy;
+
+        Queue* m_queue = nullptr;
 
         void windMouse(
             cooint_t x, cooint_t y,
@@ -38,6 +41,8 @@ class WindMouse {
         );
         void do_move(cooint_t x, cooint_t y);
         void do_syncParam(const std::string& key, int8_t& param);
+        void do_syncParam(const std::string& key, int16_t& param);
+        void do_syncParam(const std::string& key, double& param);
 
 };
 

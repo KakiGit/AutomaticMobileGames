@@ -1,10 +1,8 @@
 #include "windmouse.h"
 #include "math.h"
 #include "esp_random.h"
-#include <sstream>
 #include "USB.h"
 #include <esp_log.h>
-#include <ramdb.h>
 
 const static double sqrt3 = sqrt(3);
 const static double sqrt5 = sqrt(5);
@@ -28,6 +26,7 @@ WindMouse::WindMouse() {
     USBSetup();
     m_mouse->begin();
     errs = std::pair<double, double>(0, 0);
+    m_queue = RDB.subscribe("POSITION");
     srand(esp_random());
 }
 
@@ -36,8 +35,16 @@ WindMouse::~WindMouse() {
     delete m_mouse;
 }
 
+void WindMouse::pullAndMove() {
+    std::pair<std::string, std::string> location = m_queue->pop();
+    cooint_t x = std::stoi(location.first);
+    cooint_t y = std::stoi(location.second);
+    ESP_LOGI(""," x %d y %d", x, y);
+    move(x, y);
+}
+
 void WindMouse::move(cooint_t x, cooint_t y) {
-    double accuracy = FINAL_ACCURACY * ((double)rand())/RAND_MAX;
+    double accuracy = final_accuracy * ((double)rand())/RAND_MAX;
     windMouse(
         round(x - errs.first),
         round(y - errs.second),
@@ -58,9 +65,27 @@ void WindMouse::release(uint8_t b) {
 }
 
 void WindMouse::do_syncParam(const std::string& key, int8_t& param) {
-    String s(RDB.read(key).c_str());
-    if (!s.isEmpty()) {
-        param = s.toInt();
+    std::string value = RDB.read(key);
+    if (!value.empty()) {
+        param = std::stoi(value);
+    } else {
+        ESP_LOGI("", "Not able to sync %s", key);
+    }
+}
+
+void WindMouse::do_syncParam(const std::string& key, int16_t& param) {
+    std::string value = RDB.read(key);
+    if (!value.empty()) {
+        param = std::stoi(value);
+    } else {
+        ESP_LOGI("", "Not able to sync %s", key);
+    }
+}
+
+void WindMouse::do_syncParam(const std::string& key, double& param) {
+    std::string value = RDB.read(key);
+    if (!value.empty()) {
+        param = std::stod(value);
     } else {
         ESP_LOGI("", "Not able to sync %s", key);
     }
@@ -72,11 +97,13 @@ void WindMouse::syncParams() {
     do_syncParam("W", W);
     do_syncParam("M", M);
     do_syncParam("D", D);
+    do_syncParam("final_accuracy", final_accuracy);
+    do_syncParam("report_rate", report_rate);
 }
 
 void WindMouse::do_move(cooint_t x, cooint_t y) {
     m_mouse->move(x, y);
-    delay(1000/REPORT_RATE);
+    delay(1000/report_rate);
 }
 
 void WindMouse::windMouse(cooint_t dest_x, cooint_t dest_y, double final_accuracy) {

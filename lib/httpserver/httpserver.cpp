@@ -1,17 +1,13 @@
 #include "httpserver.h"
 #include <math.h>
+#include <esp_log.h>
+#include <ramdb.h>
+#include <sstream>
+#include <vector>
 
-/* Our URI handler function to be called during GET /uri request */
-esp_err_t get_handler(httpd_req_t *req)
-{
-    /* Send a simple response */
-    const char resp[] = "URI GET Response";
-    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
-}
 
-/* Our URI handler function to be called during POST /uri request */
-esp_err_t post_handler(httpd_req_t *req)
+/* Our URI handler function to be called during POST /params request */
+esp_err_t param_post_handler(httpd_req_t *req)
 {
     /* Destination buffer for content of HTTP POST request.
      * httpd_req_recv() accepts char* only, but content could
@@ -37,25 +33,72 @@ esp_err_t post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    std::string s_content(content, recv_size);
+    std::vector<std::string> result = std::vector<std::string>{};
+    std::stringstream ss = std::stringstream{s_content};
+
+    for (std::string line; std::getline(ss, line, '\n');) {
+        result.push_back(line);
+    }
+    for (auto it = result.begin(); it != result.end(); it++) {
+        uint separator_index = it->find("=");
+        std::string key = it->substr(0, separator_index);
+        std::string value = it->substr(separator_index + 1);
+        RDB.write(key, value);
+    }
+
     /* Send a simple response */
-    const char resp[] = "URI POST Response";
-    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, s_content.c_str(), HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
-/* URI handler structure for GET /uri */
-httpd_uri_t uri_get = {
-    .uri      = "/uri",
-    .method   = HTTP_GET,
-    .handler  = get_handler,
+esp_err_t position_post_handler(httpd_req_t *req)
+{
+
+    char content[100];
+
+    size_t recv_size = fmin(req->content_len, sizeof(content));
+
+    int ret = httpd_req_recv(req, content, recv_size);
+    if (ret <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+    std::string s_content(content, recv_size);
+    ESP_LOGI("", "content %s", s_content.c_str());
+    std::vector<std::string> result = std::vector<std::string>{};
+    std::stringstream ss = std::stringstream{s_content};
+
+    for (std::string line; std::getline(ss, line, '\n');) {
+        result.push_back(line);
+    }
+
+    for (auto it = result.begin(); it != result.end(); it++) {
+        uint separator_index = it->find(",");
+        std::string x = it->substr(0, separator_index);
+        std::string y = it->substr(separator_index + 1);
+        RDB.send("POSITION", std::make_pair(x, y));
+    }
+
+    /* Send a simple response */
+    httpd_resp_send(req, s_content.c_str(), HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+httpd_uri_t params_post = {
+    .uri      = "/params",
+    .method   = HTTP_POST,
+    .handler  = param_post_handler,
     .user_ctx = NULL
 };
 
-/* URI handler structure for POST /uri */
-httpd_uri_t uri_post = {
-    .uri      = "/uri",
+
+httpd_uri_t position_post = {
+    .uri      = "/position",
     .method   = HTTP_POST,
-    .handler  = post_handler,
+    .handler  = position_post_handler,
     .user_ctx = NULL
 };
 
@@ -72,8 +115,8 @@ httpd_handle_t start_webserver(void)
     /* Start the httpd server */
     if (httpd_start(&server, &config) == ESP_OK) {
         /* Register URI handlers */
-        httpd_register_uri_handler(server, &uri_get);
-        httpd_register_uri_handler(server, &uri_post);
+        httpd_register_uri_handler(server, &params_post);
+        httpd_register_uri_handler(server, &position_post);
     }
     /* If server failed to start, handle will be NULL */
     return server;

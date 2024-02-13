@@ -1,21 +1,89 @@
 #include "ramdb.h"
 #include <esp_log.h>
 
+Queue::Queue(){
+    m_queue = new std::queue<Queue_T>;
+    subscriber_count = 0;
+}
+
+Queue::~Queue(){
+    delete m_queue;
+}
+
+void Queue::push(Queue_T item) {
+    ESP_LOGI(""," pushing %s %s", item.first.c_str(), item.second.c_str());
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_queue->push(item);
+    m_cond.notify_one();
+}
+
+Queue_T Queue::pop() {
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    m_cond.wait(lock,
+                [this]() { return !m_queue->empty(); });
+
+    Queue_T item = m_queue->front();
+    m_queue->pop();
+    ESP_LOGI(""," popping queue %s %s", item.first.c_str(), item.second.c_str());
+    return item;
+}
+
+void Queue::subscribe() {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    subscriber_count += 1;
+}
+
+uint Queue::unsubscribe() {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    subscriber_count -= 1;
+    return subscriber_count;
+}
+
 RAMDB::RAMDB() {
-    ESP_LOGI("", "Trying to create PSRAMDB");
-    psramInit();
     m_db = new std::map<DBMap_T>;
-    ESP_LOGI("", "Total: %d. Used PSRAM: %d", ESP.getPsramSize(), ESP.getPsramSize() - ESP.getFreePsram());
+    m_queues = new std::map<std::string, Queue*>;
     m_rwLock = xSemaphoreCreateCounting(1, 1);
     m_readCountLock = xSemaphoreCreateCounting(5, 1);
 }
 
 RAMDB::~RAMDB() {
-    m_db->~map<DBMap_T>();
-    free(m_db);
+    delete m_db;
+    delete m_queues;
     vSemaphoreDelete(m_rwLock);
     vSemaphoreDelete(m_readCountLock);
 }
+
+Queue* RAMDB::subscribe(std::string tag) {
+    ESP_LOGI(""," subscribing %s", tag);
+    std::unique_lock<std::mutex> lock(m_queueMutex);
+    auto res = m_queues->insert(std::make_pair(tag, new Queue()));
+    res.first->second->subscribe();
+    return res.first->second;
+}
+
+bool RAMDB::unsubscribe(std::string tag) {
+    std::unique_lock<std::mutex> lock(m_queueMutex);
+    auto res = m_queues->find(tag);
+    if (res != m_queues->end()) {
+        uint count = res->second->unsubscribe();
+        if (count == 0) {
+            m_queues->erase(res);
+        }
+    }
+}
+
+bool RAMDB::send(std::string tag, Queue_T data) {
+    ESP_LOGI(""," sending %s %s", data.first.c_str(), data.second.c_str());
+    std::unique_lock<std::mutex> lock(m_queueMutex);
+    auto it = m_queues->find(tag);
+    if (it != m_queues->end()) {
+        it->second->push(data);
+        return true;
+    }
+    return false;
+}
+
 
 std::string RAMDB::read(const std::string& key) {
     std::string res;
@@ -52,12 +120,7 @@ std::string RAMDB::read(const std::string& key) {
 }
 
 bool RAMDB::write(std::string key, std::string value) {
-    size_t freePsram = ESP.getFreePsram();
-    size_t usedPsram = ESP.getPsramSize() - ESP.getFreePsram();
-    if (freePsram < 64) {
-        ESP_LOGI("", "Cannot write into DB. PRSAM full. %d remaining.", freePsram);
-        return false;
-    }
+
     // Acquire the writer lock
     if (xSemaphoreTake(m_rwLock, portMAX_DELAY)) {
         ESP_LOGI("", "Write Task is writing...");
@@ -66,7 +129,6 @@ bool RAMDB::write(std::string key, std::string value) {
         if (!res.second) {
             res.first->second = value;
         }
-        ESP_LOGI("", "PSRAM %d used. %d remaining.", usedPsram, freePsram);
 
         // Release the writer lock
         xSemaphoreGive(m_rwLock);
