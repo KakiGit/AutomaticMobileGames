@@ -37,6 +37,7 @@ WindMouse::~WindMouse() {
 
 void WindMouse::pullAndMove() {
     std::pair<std::string, std::string> location = m_queue->pop();
+    syncParams();
     cooint_t x = std::stoi(location.first);
     cooint_t y = std::stoi(location.second);
     ESP_LOGI(""," x %d y %d", x, y);
@@ -108,12 +109,14 @@ void WindMouse::do_move(cooint_t x, cooint_t y) {
 
 void WindMouse::windMouse(cooint_t dest_x, cooint_t dest_y, double final_accuracy) {
     double M_0 = M;
+    double M_0_0 = M_0;
     cooint_t current_x, current_y;
     double start_x, start_y;
     double W_x, W_y, v_x, v_y;
     cooint_t r_dest_x = dest_x + final_accuracy * z_rand();
     cooint_t r_dest_y = dest_y + final_accuracy * z_rand();
     double distribution = 0.5 * final_accuracy;
+    double orig_dist = hypot(r_dest_x - start_x, r_dest_y - start_y);
     for(double dist = hypot(r_dest_x - start_x, r_dest_y - start_y); dist >= distribution;) {
         double W_mag = fmin(W, dist);
 
@@ -123,6 +126,7 @@ void WindMouse::windMouse(cooint_t dest_x, cooint_t dest_y, double final_accurac
 
             W_x = W_x/sqrt3 + x_rand * W_mag/sqrt5;
             W_y = W_y/sqrt3 + y_rand * W_mag/sqrt5;
+            M_0 = M_0_0 * dist / orig_dist;
         } else {
             W_x /= sqrt3;
             W_y /= sqrt3;

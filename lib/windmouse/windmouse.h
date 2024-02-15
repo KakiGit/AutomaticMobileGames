@@ -29,7 +29,7 @@ class WindMouse {
         // W_0 - magnitude of the wind force fluctuations
         // M_0 - maximum step size (velocity clip threshold)
         // D_0 - distance where wind behavior changes from random to damped
-        int8_t G, W, M, D;
+        int16_t G, W, M, D;
         int16_t report_rate;
         double final_accuracy;
 

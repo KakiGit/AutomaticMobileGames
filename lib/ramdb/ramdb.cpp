@@ -55,7 +55,7 @@ RAMDB::~RAMDB() {
 }
 
 Queue* RAMDB::subscribe(std::string tag) {
-    ESP_LOGI(""," subscribing %s", tag);
+    ESP_LOGI(""," subscribing %s", tag.c_str());
     std::unique_lock<std::mutex> lock(m_queueMutex);
     auto res = m_queues->insert(std::make_pair(tag, new Queue()));
     res.first->second->subscribe();

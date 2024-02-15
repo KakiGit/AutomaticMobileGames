@@ -62,12 +62,12 @@ void WiFiSetup() {
 }
 
 void initParams() {
-  RDB.write("G", "9");
+  RDB.write("G", "6");
   RDB.write("W", "5");
-  RDB.write("M", "20");
-  RDB.write("D", "12");
-  RDB.write("report_rate", "200");
-  RDB.write("final_accuracy", "500");
+  RDB.write("M", "50");
+  RDB.write("D", "127");
+  RDB.write("report_rate", "500");
+  RDB.write("final_accuracy", "30");
 }
 
 const static std::vector<std::pair<cooint_t, cooint_t>> CURVE{
@@ -86,7 +86,6 @@ void mouseControl(void *parameter)
   {
     ESP_LOGI("", "Moving...");
     srand(esp_random());
-    windMouse.syncParams();
     windMouse.pullAndMove();
   }
 }
