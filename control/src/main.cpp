@@ -84,9 +84,9 @@ void mouseControl(void *parameter)
 
   for (;;)
   {
-    ESP_LOGI("", "Moving...");
+    ESP_LOGI("", "Pulling...");
     srand(esp_random());
-    windMouse.pullAndMove();
+    windMouse.pullAndDo();
   }
 }
 

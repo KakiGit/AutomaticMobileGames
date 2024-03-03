@@ -26,7 +26,7 @@ WindMouse::WindMouse() {
     USBSetup();
     m_mouse->begin();
     errs = std::pair<double, double>(0, 0);
-    m_queue = RDB.subscribe("POSITION");
+    m_queue = RDB.subscribe("COMMAND");
     srand(esp_random());
 }
 
@@ -35,13 +35,20 @@ WindMouse::~WindMouse() {
     delete m_mouse;
 }
 
-void WindMouse::pullAndMove() {
-    std::pair<std::string, std::string> location = m_queue->pop();
-    syncParams();
-    cooint_t x = std::stoi(location.first);
-    cooint_t y = std::stoi(location.second);
-    ESP_LOGI(""," x %d y %d", x, y);
-    move(x, y);
+void WindMouse::pullAndDo() {
+    Queue_T command = m_queue->pop();
+    if (command.first.compare("POSITION") == 0) {
+        syncParams();
+        cooint_t x = std::stoi(command.second.first);
+        cooint_t y = std::stoi(command.second.second);
+        ESP_LOGI("POSITION"," x %d y %d", x, y);
+        move(x, y);
+    } else if (command.first.compare("CLICK") == 0)
+    {
+        click(std::stoi(command.second.first));
+        ESP_LOGI("CLICK"," x %s", command.second.first.c_str());
+    }
+    
 }
 
 void WindMouse::move(cooint_t x, cooint_t y) {
@@ -67,11 +74,15 @@ void WindMouse::release(uint8_t button) {
 
 void WindMouse::click(uint8_t button) {
     // World record 17.4 CPS.
-    // Normal people 5-7 CPS
-    double cps = z_rand() * 2 + 6;
+    // Normal people 5-8 CPS
+    double cps = z_rand() * 3 + 6.5;
+    ESP_LOGI("CLICK"," CPS %.2f", cps);
     m_mouse->press(button);
-    delay(round(1000.0/cps));
-    m_mouse->release(button);
+    delay(round(1000.0/cps/2));
+    if (m_mouse->isPressed(button)) {
+        m_mouse->release(button);
+    }
+    delay(round(1000.0/cps/2));
 }
 
 void WindMouse::do_syncParam(const std::string& key, int8_t& param) {

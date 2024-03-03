@@ -76,45 +76,12 @@ esp_err_t position_post_handler(httpd_req_t *req)
     }
 
     for (auto it = result.begin(); it != result.end(); it++) {
+        uint command_separator_index = it->find("=");
+        std::string command = it->substr(0, command_separator_index);
         uint separator_index = it->find(",");
-        std::string x = it->substr(0, separator_index);
+        std::string x = it->substr(command_separator_index + 1, separator_index);
         std::string y = it->substr(separator_index + 1);
-        RDB.send("POSITION", std::make_pair(x, y));
-    }
-
-    /* Send a simple response */
-    httpd_resp_send(req, s_content.c_str(), HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
-}
-
-esp_err_t click_post_handler(httpd_req_t *req)
-{
-
-    char content[100];
-
-    size_t recv_size = fmin(req->content_len, sizeof(content));
-
-    int ret = httpd_req_recv(req, content, recv_size);
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
-    std::string s_content(content, recv_size);
-    ESP_LOGI("", "content %s", s_content.c_str());
-    std::vector<std::string> result = std::vector<std::string>{};
-    std::stringstream ss = std::stringstream{s_content};
-
-    for (std::string line; std::getline(ss, line, '\n');) {
-        result.push_back(line);
-    }
-
-    for (auto it = result.begin(); it != result.end(); it++) {
-        uint separator_index = it->find(",");
-        std::string x = it->substr(0, separator_index);
-        std::string y = it->substr(separator_index + 1);
-        RDB.send("CLICK", std::make_pair(x, y));
+        RDB.send("COMMAND", std::make_pair(command, std::make_pair(x, y)));
     }
 
     /* Send a simple response */
@@ -151,7 +118,7 @@ httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         /* Register URI handlers */
         httpd_register_uri_handler(server, &params_post);
-        httpd_register_uri_handler(server, &comman);
+        httpd_register_uri_handler(server, &command_post);
     }
     /* If server failed to start, handle will be NULL */
     return server;

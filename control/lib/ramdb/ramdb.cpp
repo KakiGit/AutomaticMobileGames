@@ -11,7 +11,7 @@ Queue::~Queue(){
 }
 
 void Queue::push(Queue_T item) {
-    ESP_LOGI(""," pushing %s %s", item.first.c_str(), item.second.c_str());
+    ESP_LOGI(""," pushing %s %s %s", item.first.c_str(), item.second.first.c_str(), item.second.second.c_str());
     std::unique_lock<std::mutex> lock(m_mutex);
     m_queue->push(item);
     m_cond.notify_one();
@@ -25,7 +25,7 @@ Queue_T Queue::pop() {
 
     Queue_T item = m_queue->front();
     m_queue->pop();
-    ESP_LOGI(""," popping queue %s %s", item.first.c_str(), item.second.c_str());
+    ESP_LOGI(""," popping queue %s %s %s", item.first.c_str(), item.second.first.c_str(), item.second.second.c_str());
     return item;
 }
 
@@ -74,7 +74,7 @@ bool RAMDB::unsubscribe(std::string tag) {
 }
 
 bool RAMDB::send(std::string tag, Queue_T data) {
-    ESP_LOGI(""," sending %s %s", data.first.c_str(), data.second.c_str());
+    ESP_LOGI(""," sending %s %s", data.first.c_str(), data.second.first.c_str(), data.second.second.c_str());
     std::unique_lock<std::mutex> lock(m_queueMutex);
     auto it = m_queues->find(tag);
     if (it != m_queues->end()) {

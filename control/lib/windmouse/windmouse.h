@@ -18,7 +18,7 @@ class WindMouse {
         bool isPressed(uint8_t button = MOUSE_LEFT);
         void click(uint8_t button);
         void syncParams();
-        void pullAndMove();
+        void pullAndDo();
 
     private:
 

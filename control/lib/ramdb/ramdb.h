@@ -10,7 +10,7 @@
 #define PSRAMDB_H
 
 #define DBMap_T std::string, std::string
-#define Queue_T std::pair<std::string, std::string>
+#define Queue_T std::pair<std::string, std::pair<std::string, std::string>>
 
 
 class Queue {
