@@ -53,16 +53,25 @@ void WindMouse::move(cooint_t x, cooint_t y) {
     );
 }
 
-void WindMouse::press(uint8_t b) {
-    m_mouse->press(b);
+void WindMouse::press(uint8_t button) {
+    m_mouse->press(button);
 }
 
-bool WindMouse::isPressed(uint8_t b) {
-    return m_mouse->isPressed(b);
+bool WindMouse::isPressed(uint8_t button) {
+    return m_mouse->isPressed(button);
 }
 
-void WindMouse::release(uint8_t b) {
-    m_mouse->release(b);
+void WindMouse::release(uint8_t button) {
+    m_mouse->release(button);
+}
+
+void WindMouse::click(uint8_t button) {
+    // World record 17.4 CPS.
+    // Normal people 5-7 CPS
+    double cps = z_rand() * 2 + 6;
+    m_mouse->press(button);
+    delay(round(1000.0/cps));
+    m_mouse->release(button);
 }
 
 void WindMouse::do_syncParam(const std::string& key, int8_t& param) {

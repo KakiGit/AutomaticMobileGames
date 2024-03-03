@@ -13,9 +13,10 @@ class WindMouse {
         WindMouse();
         ~WindMouse();
         void move(cooint_t x, cooint_t y);
-        void press(uint8_t b = MOUSE_LEFT);
-        void release(uint8_t b = MOUSE_LEFT);
-        bool isPressed(uint8_t b = MOUSE_LEFT);
+        void press(uint8_t button = MOUSE_LEFT);
+        void release(uint8_t button = MOUSE_LEFT);
+        bool isPressed(uint8_t button = MOUSE_LEFT);
+        void click(uint8_t button);
         void syncParams();
         void pullAndMove();
 
